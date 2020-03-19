@@ -3,14 +3,6 @@ import torch
 import torchvision.models as models
 
 
-
-
-
-config = [4, 6, 6, 6, 4, 4]
-vgg_ = [21, 24, 32, 34, 36, 38]
-num_classes = 7
-
-
 def vgg_backbone():
     vgg_net = models.vgg16().features
     vgg_net[16] = nn.MaxPool2d(2, 2, 0, 1, ceil_mode=False)
@@ -79,45 +71,6 @@ class SSD_net(nn.Module):
                                  for conf_pred in conf_output_dict.values()], 1)
         del loc_output_dict, conf_output_dict
         return {'loc': loc_output, 'conf': conf_output}
-
-
-    # # @property
-    # def multi_class_layer(self, num_classes, config, vgg_net):
-    #     loc_layers = {}
-    #     conf_layers = {}
-    #     for layer_no, box_num in config.items():
-    #         layer_num_int = int(layer_no.split('_')[-1])
-    #         layer_out_channel = vgg_net[layer_num_int].out_channels
-    #         min_kernel_size = min(vgg_net[layer_num_int].kernel_size)
-    #         loc_layer = nn.Conv2d(layer_out_channel, box_num * 4, kernel_size=min_kernel_size,
-    #                               padding=1 if min_kernel_size == 3 else 0)
-    #         conf_layer = nn.Conv2d(layer_out_channel, box_num * num_classes, kernel_size=min_kernel_size,
-    #                                padding=1 if min_kernel_size == 3 else 0)
-    #         loc_layers[str(layer_num_int)] = loc_layer
-    #         conf_layers[str(layer_num_int)] = conf_layer
-    #     return loc_layers, conf_layers
-    #
-    # # @property
-    # def vgg_backbone(self):
-    #     vgg_net = models.vgg16().features
-    #     vgg_net[16] = nn.MaxPool2d(2, 2, 0, 1, ceil_mode=False)
-    #     vgg_net[-1] = nn.MaxPool2d(3, 1, 1, 1, ceil_mode=False)
-    #
-    #     add_modules = [
-    #         nn.Conv2d(512, 1024, kernel_size=3, padding=6, dilation=6),
-    #         nn.Conv2d(1024, 1024, kernel_size=1),
-    #         nn.Conv2d(1024, 256, kernel_size=(1, 1), stride=(1, 1)),
-    #         nn.Conv2d(256, 512, kernel_size=(3, 3), stride=(2, 2), padding=(1, 1)),
-    #         nn.Conv2d(512, 128, kernel_size=(1, 1), stride=(1, 1)),
-    #         nn.Conv2d(128, 256, kernel_size=(3, 3), stride=(2, 2), padding=(1, 1)),
-    #         nn.Conv2d(256, 128, kernel_size=(1, 1), stride=(1, 1)),
-    #         nn.Conv2d(128, 256, kernel_size=(3, 3), stride=(1, 1)),
-    #         nn.Conv2d(256, 128, kernel_size=(1, 1), stride=(1, 1)),
-    #         nn.Conv2d(128, 256, kernel_size=(3, 1), stride=(1, 1))
-    #     ]
-    #     for i in range(len(add_modules)):
-    #         vgg_net.add_module(str(len(vgg_net)), add_modules[i])
-    #     return vgg_net
 
 
 if __name__ == '__main__':
