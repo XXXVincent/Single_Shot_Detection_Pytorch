@@ -1,7 +1,7 @@
 import torch.nn as nn
 import torch
 import torchvision.models as models
-
+import math
 
 def vgg_backbone():
     vgg_net = models.vgg16().features
@@ -62,6 +62,7 @@ class SSD_net(nn.Module):
 
             if i == self.multi_class_layer_no[current_multi_class_layer_idx]:
                 loc = self.loc_layers[str(i)](x)
+                print(loc.shape)
                 conf = self.conf_layers[str(i)](x)
                 loc_output_dict[str(i)] = loc
                 conf_output_dict[str(i)] = conf
@@ -73,15 +74,82 @@ class SSD_net(nn.Module):
         return {'loc': loc_output, 'conf': conf_output}
 
 
+class PrioiBox(nn.Module):
+    def __init__(self, config):
+        super(PrioiBox, self).__init__()
+        self.config = config
+        self.img_size = config['img_size']
+        self.layer_shape = config['layer_shape']
+        self.layer_priorbox = config['layer_priorbox']
+        self.layer_aspect_ratio = config['layer_aspect_ratio']
+        self.min_size = config['min_size']
+        self.max_size = config['max_size']
+        self.relative_feature_size = config['relative_feature_size']
+        self.clip = config['clip']
+
+    def forward(self):
+        box = []
+        for k, f in enumerate(self.layer_shape):
+            f_k_x = self.img_size[0]/self.relative_feature_size[k][0]
+            f_k_y = self.img_size[1]/self.relative_feature_size[k][1]
+            for i in range(self.layer_shape[k][0]):
+                for j in range(self.layer_shape[k][1]):
+                    cx = (i + 0.5)/f_k_x
+                    cy = (j + 0.5)/f_k_y
+                    s_k_x = self.min_size[k][0]/self.img_size[0]
+                    s_k_y = self.min_size[k][1]/self.img_size[1]
+                    box += [cx, cy, s_k_x, s_k_y]
+                    s_k_x_plus = self.max_size[k][0]/self.img_size[0]
+                    s_k_y_plus = self.max_size[k][1]/self.img_size[1]
+                    box += [cx, cy, s_k_x_plus, s_k_y_plus]
+
+                    for r in self.layer_aspect_ratio[k]:
+                        box += [cx, cy, s_k_x * math.sqrt(r), s_k_y/math.sqrt(r)]
+                        box += [cx, cy, s_k_x / math.sqrt(r), s_k_y*math.sqrt(r)]
+
+        boxes = torch.tensor(box).view(-1, 4)
+        if self.clip:
+            boxes.clamp_(max=1, min=0)
+
+        return boxes
+
+
+
+
+prior_box_config = {
+    'img_size': [320, 192],
+    'layer_shape': [[40, 24], (20, 12), (10, 6), (5, 3), (3, 1), (1, 1)],
+    'layer_priorbox': [4, 6, 6, 6, 4, 4],
+    'layer_aspect_ratio': [[2], [2, 3], [2, 3], [2, 3], [2], [2]],
+    'min_size': [[30, 18], [45, 27], [67, 40], [100, 60], [125, 75], [188, 94]],
+    'max_size': [[60, 36], [90, 54], [135, 81], [162, 97], [194, 116], [240, 144]],
+    'relative_feature_size': [[8, 8], [16, 16], [32, 32], [64, 64], [192, 192], [320, 192]],
+    'clip': True
+}
+
+
+
+
 if __name__ == '__main__':
     config = {
         'layer_21': 4,
         'layer_28': 6,
         'layer_34': 6,
         'layer_36': 6,
-        'layer_38': 6,
+        'layer_38': 4,
         'layer_40': 4
     }
     ssd = SSD_net(num_classes=7, box_config=config)
     x = torch.randn(size=(1, 3, 320, 192))
     ssd(x)
+    p_box = PrioiBox(prior_box_config)
+    boxes = p_box()
+    print("Total box num: ", boxes.shape)
+
+    # multi layer shape
+    # torch.Size([1, 16, 40, 24])
+    # torch.Size([1, 24, 20, 12])
+    # torch.Size([1, 24, 10, 6])
+    # torch.Size([1, 24, 5, 3])
+    # torch.Size([1, 24, 3, 1])
+    # torch.Size([1, 16, 1, 1])
