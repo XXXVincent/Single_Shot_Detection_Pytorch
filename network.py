@@ -62,7 +62,6 @@ class SSD_net(nn.Module):
 
             if i == self.multi_class_layer_no[current_multi_class_layer_idx]:
                 loc = self.loc_layers[str(i)](x)
-                print(loc.shape)
                 conf = self.conf_layers[str(i)](x)
                 loc_output_dict[str(i)] = loc
                 conf_output_dict[str(i)] = conf
