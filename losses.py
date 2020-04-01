@@ -3,6 +3,12 @@ import torch.nn as nn
 import torch.functional as F
 from utils import match
 
+
+def log_sum_exp(x):
+    x_max = x.detach().max()
+    return torch.log(torch.sum(torch.exp(x-x_max), 1, keepdim=True))+x_max
+
+
 class MultiBoxLoss(nn.Module):
     def __init__(self, num_classes,iou_thresh, neg_pos, use_gpu=False):
         super(MultiBoxLoss, self).__init__()
@@ -11,6 +17,7 @@ class MultiBoxLoss(nn.Module):
         self.threshold = iou_thresh
         self.negpos_ratio = neg_pos
         self.variance = 0
+
     def forward(self, pred, targets):
         loc = pred['loc']
         conf = pred['conf']
@@ -39,7 +46,7 @@ class MultiBoxLoss(nn.Module):
         conf_logP = conf_logP.view(batch_size, -1)
         conf_logP[pos] = 0
         _, index = conf_logP.sort(1, descending=True)
-        _, idx_rank = indel.sort(1)
+        _, idx_rank = index.sort(1)
 
         num_pos = pos.long().sum(1, keepdim=True)
         num_neg = torch.clamp(self.negpos_ratio*num_pos, max=pos.size(1)-1)
