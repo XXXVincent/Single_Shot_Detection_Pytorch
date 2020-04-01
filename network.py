@@ -42,13 +42,16 @@ def multi_class_layer(num_classes, config, vgg_net):
 
 
 class SSD_net(nn.Module):
-    def __init__(self, num_classes, box_config):
+    def __init__(self, num_classes, box_config, prior_setting):
         super(SSD_net, self).__init__()
         self.backbone = vgg_backbone()
         self.num_classes = num_classes
         self.multi_class_layer_no = list(map(lambda x: int(x.split('_')[-1]), box_config.keys()))
         self.multi_class_layer_no = sorted(self.multi_class_layer_no)
         self.loc_layers, self.conf_layers = multi_class_layer(num_classes, box_config, self.backbone)
+        prior = PriorBox(prior_setting)
+        self.priorbox = prior.forward()
+
 
     def forward(self, input):
         loc_output_dict = {}
@@ -70,12 +73,12 @@ class SSD_net(nn.Module):
         conf_output = torch.cat([conf_pred.view(conf_pred.size(0), -1, self.num_classes,)
                                  for conf_pred in conf_output_dict.values()], 1)
         del loc_output_dict, conf_output_dict
-        return {'loc': loc_output, 'conf': conf_output}
+        return {'loc': loc_output, 'conf': conf_output, 'priorbox': self.priorbox}
 
 
-class PrioiBox(nn.Module):
+class PriorBox(nn.Module):
     def __init__(self, config):
-        super(PrioiBox, self).__init__()
+        super(PriorBox, self).__init__()
         self.config = config
         self.img_size = config['img_size']
         self.layer_shape = config['layer_shape']
@@ -138,10 +141,10 @@ if __name__ == '__main__':
         'layer_38': 4,
         'layer_40': 4
     }
-    ssd = SSD_net(num_classes=7, box_config=config)
+    ssd = SSD_net(num_classes=7, box_config=config, prior_setting=prior_box_config)
     x = torch.randn(size=(1, 3, 320, 192))
-    ssd(x)
-    p_box = PrioiBox(prior_box_config)
+    dict = ssd(x)
+    p_box = PriorBox(prior_box_config)
     boxes = p_box()
     print("Total box num: ", boxes.shape)
 
